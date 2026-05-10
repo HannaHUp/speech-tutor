@@ -1,5 +1,8 @@
 """REQ-02/08 - provider factory tests."""
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
+from pydantic import SecretStr
 
 
 def test_factory_raises_on_unknown_stt_impl(dummy_settings):
@@ -35,8 +38,45 @@ def test_null_pronunciation_returns_disabled_on_empty_bytes():
     assert p.analyze(b"") == {"enabled": False}
 
 
-@pytest.mark.skip(reason="W0 stub - implemented in Plan 03 (STT impls)")
-def test_openai_stt_returns_str(dummy_settings, silence_1s_bytes):
-    from server.providers import get_stt_provider
+@pytest.mark.asyncio
+async def test_openai_stt_returns_tuple(dummy_settings, silence_1s_bytes):
+    from server.providers.stt_openai import OpenAIWhisperSTT
 
-    ...
+    dummy_settings.openai_api_key = SecretStr("sk-test")
+    stt = OpenAIWhisperSTT(dummy_settings)
+    fake_resp = MagicMock()
+    fake_resp.text = "Hello world"
+    fake_resp.words = [MagicMock(word="Hello", start=0.0, end=0.5)]
+    stt._client.audio.transcriptions.create = AsyncMock(return_value=fake_resp)
+
+    text, words = await stt.transcribe(silence_1s_bytes)
+
+    assert text == "Hello world"
+    assert words == [{"word": "Hello", "start": 0.0, "end": 0.5}]
+    kwargs = stt._client.audio.transcriptions.create.call_args.kwargs
+    assert kwargs["model"] == "whisper-1"
+    assert kwargs["response_format"] == "verbose_json"
+    assert kwargs["timestamp_granularities"] == ["word"]
+
+
+@pytest.mark.asyncio
+async def test_openai_stt_filters_hallucination(dummy_settings, silence_1s_bytes):
+    from server.providers.stt_openai import OpenAIWhisperSTT
+
+    dummy_settings.openai_api_key = SecretStr("sk-test")
+    stt = OpenAIWhisperSTT(dummy_settings)
+    fake_resp = MagicMock(text="thank you for watching", words=[])
+    stt._client.audio.transcriptions.create = AsyncMock(return_value=fake_resp)
+
+    text, words = await stt.transcribe(silence_1s_bytes)
+
+    assert text == ""
+    assert words == []
+
+
+def test_openai_stt_satisfies_protocol(dummy_settings):
+    from server.providers.protocols import STTProvider
+    from server.providers.stt_openai import OpenAIWhisperSTT
+
+    dummy_settings.openai_api_key = SecretStr("sk-test")
+    assert isinstance(OpenAIWhisperSTT(dummy_settings), STTProvider)
