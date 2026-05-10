@@ -128,3 +128,55 @@ def test_faster_whisper_stt_satisfies_protocol(dummy_settings, monkeypatch):
     monkeypatch.setattr(mod, "WhisperModel", lambda *args, **kwargs: MagicMock())
 
     assert isinstance(mod.FasterWhisperSTT(dummy_settings), STTProvider)
+
+
+@pytest.mark.asyncio
+async def test_anthropic_llm_yields_text_deltas(dummy_settings):
+    import server.providers.llm_anthropic as mod
+
+    deltas = ["Hello ", "world.", ""]
+
+    class FakeStream:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        @property
+        def text_stream(self):
+            async def gen():
+                for delta in deltas:
+                    if delta:
+                        yield delta
+
+            return gen()
+
+    class FakeMessages:
+        def stream(self, **kwargs):
+            self.last_kwargs = kwargs
+            return FakeStream()
+
+    class FakeClient:
+        def __init__(self):
+            self.messages = FakeMessages()
+
+    llm = mod.AnthropicLLM(dummy_settings)
+    llm._client = FakeClient()
+
+    collected = []
+    async for text in llm.stream("SYSTEM PREFIX", [{"role": "user", "content": "Hi"}]):
+        collected.append(text)
+
+    assert collected == ["Hello ", "world."]
+    kwargs = llm._client.messages.last_kwargs
+    assert kwargs["model"] == dummy_settings.llm_model
+    assert kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert kwargs["system"][0]["text"] == "SYSTEM PREFIX"
+
+
+def test_anthropic_llm_satisfies_protocol(dummy_settings):
+    from server.providers.llm_anthropic import AnthropicLLM
+    from server.providers.protocols import LLMProvider
+
+    assert isinstance(AnthropicLLM(dummy_settings), LLMProvider)
