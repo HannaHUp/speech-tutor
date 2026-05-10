@@ -1,0 +1,21 @@
+.planning/
+.codex/
+CLAUDE.md
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Env
+.env
+
+# Node / Svelte build
+web/node_modules/
+web/dist/
+
+# uv
+.uv/
+.uv-cache/
+uv.lock

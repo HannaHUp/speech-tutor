@@ -1,0 +1,31 @@
+[project]
+name = "hermes-speech-tutor"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi==0.136.1",
+    "uvicorn[standard]==0.46.0",
+    "pydantic-settings==2.14.1",
+    "anthropic==0.100.0",
+    "openai>=1.61,<2",
+    "faster-whisper==1.2.1",
+    "edge-tts==7.2.8",
+    "librosa==0.11.0",
+    "numpy>=2.2,<3",
+    "scipy>=1.13",
+    "httpx>=0.28",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "pytest-asyncio==1.3.0",
+    "websockets==16.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: slow tests that hit real providers (excluded from quick run)",
+    "manual: tests that require microphone or pre-recorded wav input",
+]
