@@ -7,11 +7,21 @@ Lifespan order (D-18):
 """
 import shutil
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from server.config import Settings
+from server.providers import (
+    get_llm_provider,
+    get_pronunciation_provider,
+    get_stt_provider,
+    get_tts_provider,
+)
+from server.ws_handler import websocket_endpoint
 
 
 def check_ffmpeg() -> None:
@@ -33,8 +43,17 @@ def check_ffmpeg() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     check_ffmpeg()
-    app.state.settings = Settings()
-    yield
+    settings = Settings()
+    app.state.settings = settings
+    app.state.stt_provider = get_stt_provider(settings)
+    app.state.tts_provider = get_tts_provider(settings)
+    app.state.llm_provider = get_llm_provider(settings)
+    app.state.pronunciation_provider = get_pronunciation_provider(settings)
+    app.state.executor = ThreadPoolExecutor(max_workers=4)
+    try:
+        yield
+    finally:
+        app.state.executor.shutdown(wait=False, cancel_futures=True)
 
 
 app = FastAPI(
@@ -47,3 +66,9 @@ app = FastAPI(
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.websocket("/ws")(websocket_endpoint)
+
+_web_dist = Path(__file__).resolve().parents[1] / "web" / "dist"
+app.mount("/", StaticFiles(directory=_web_dist, html=True, check_dir=False), name="web")
