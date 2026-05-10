@@ -3,6 +3,7 @@
 Borrowed from Hermes: tools/tts_tool.py::_SENTENCE_BOUNDARY_RE
 Borrowed from Hermes: tools/tts_tool.py::_strip_markdown_for_tts
 Borrowed from Hermes: tools/tts_tool.py::_think_block_re
+Borrowed from Hermes: tools/tts_tool.py::stream_tts_to_speaker sentence-flush shape
 Adapted from Hermes: tools/tts_tool.py::stream_tts_to_speaker
   - asyncio.Queue replaces queue.Queue; WebSocket send_bytes replaces sounddevice.
 Verified deepwiki 2026-05-10.
