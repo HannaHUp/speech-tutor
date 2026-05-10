@@ -80,3 +80,51 @@ def test_openai_stt_satisfies_protocol(dummy_settings):
 
     dummy_settings.openai_api_key = SecretStr("sk-test")
     assert isinstance(OpenAIWhisperSTT(dummy_settings), STTProvider)
+
+
+@pytest.mark.asyncio
+async def test_faster_whisper_stt_returns_tuple(
+    dummy_settings, silence_1s_bytes, monkeypatch
+):
+    import server.providers.stt_faster_whisper as mod
+
+    fake_segment = MagicMock(
+        text="Hello world",
+        words=[MagicMock(word="Hello", start=0.0, end=0.5)],
+    )
+    fake_model = MagicMock()
+    fake_model.transcribe = MagicMock(return_value=([fake_segment], MagicMock()))
+    monkeypatch.setattr(mod, "WhisperModel", lambda *args, **kwargs: fake_model)
+
+    stt = mod.FasterWhisperSTT(dummy_settings)
+    text, words = await stt.transcribe(silence_1s_bytes)
+
+    assert "Hello world" in text
+    assert words == [{"word": "Hello", "start": 0.0, "end": 0.5}]
+
+
+@pytest.mark.asyncio
+async def test_faster_whisper_passes_condition_on_previous_text_false(
+    dummy_settings, silence_1s_bytes, monkeypatch
+):
+    import server.providers.stt_faster_whisper as mod
+
+    fake_model = MagicMock()
+    fake_model.transcribe = MagicMock(return_value=(iter([]), MagicMock()))
+    monkeypatch.setattr(mod, "WhisperModel", lambda *args, **kwargs: fake_model)
+
+    stt = mod.FasterWhisperSTT(dummy_settings)
+    await stt.transcribe(silence_1s_bytes)
+
+    kwargs = fake_model.transcribe.call_args.kwargs
+    assert kwargs["condition_on_previous_text"] is False
+    assert kwargs["word_timestamps"] is True
+
+
+def test_faster_whisper_stt_satisfies_protocol(dummy_settings, monkeypatch):
+    import server.providers.stt_faster_whisper as mod
+    from server.providers.protocols import STTProvider
+
+    monkeypatch.setattr(mod, "WhisperModel", lambda *args, **kwargs: MagicMock())
+
+    assert isinstance(mod.FasterWhisperSTT(dummy_settings), STTProvider)
