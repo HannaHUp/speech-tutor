@@ -5,7 +5,7 @@
 This repository is a Phase 1 proof of concept, not a production speech tutor. It validates two hard early voice-interaction paths:
 
 - Traditional speech pipeline:
-  `browser mic -> STT -> editable transcript + prosody context -> LLM -> TTS -> playback`
+  `browser mic -> STT (OpenAI STT or faster-whisper) -> editable transcript -> LLM -> TTS (OpenAI TTS or edge-tts) -> playback`
 - Direct multimodal LLM route:
   `browser mic -> multimodal LLM voice interaction -> playback`
 

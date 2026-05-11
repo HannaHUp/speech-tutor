@@ -5,7 +5,7 @@ Hermes Speech Tutor is an intentionally scoped **Phase 1 prototype** for a brows
 It validates two local voice interaction paths:
 
 - Traditional speech pipeline:
-  `browser mic -> speech-to-text -> editable transcript + prosody context -> LLM -> text-to-speech -> playback`
+  `browser mic -> STT (OpenAI STT or faster-whisper) -> editable transcript -> LLM -> TTS (OpenAI TTS or edge-tts) -> playback`
 - Direct multimodal LLM route:
   `browser mic -> multimodal LLM voice interaction -> playback`
 
@@ -32,7 +32,6 @@ Traditional speech pipeline:
 - browser records audio
 - STT transcribes the audio
 - the learner can review or edit the transcript
-- prosody metadata is attached as text context when available
 - an LLM generates the tutor reply text
 - TTS synthesizes reply audio
 
@@ -46,7 +45,12 @@ The traditional pipeline keeps an explicit transcript boundary, which matters fo
 
 ## Provider Modes
 
-The traditional pipeline ships with paid and free/dev provider modes.
+The traditional pipeline ships with paid and free/dev provider modes:
+
+- Paid default:
+  `browser mic -> OpenAI STT -> editable transcript -> OpenAI LLM -> OpenAI TTS -> playback`
+- Free/dev:
+  `browser mic -> faster-whisper -> editable transcript -> OpenAI LLM -> edge-tts -> playback`
 
 By default, the backend uses the paid OpenAI-backed stack:
 
