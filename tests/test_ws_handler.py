@@ -299,6 +299,7 @@ def test_ws_text_only_turn_skips_stt_and_streams_tts(monkeypatch):
 def test_ws_voice_turn_writes_structured_debug_jsonl(monkeypatch, tmp_path):
     monkeypatch.setenv("DEBUG_TURN_LOG", "true")
     monkeypatch.setenv("DEBUG_TURN_LOG_PATH", str(tmp_path / "debug" / "turns.jsonl"))
+    monkeypatch.setenv("DEBUG_TURN_LOG_INCLUDE_SYSTEM_PROMPT", "false")
     app, stt = _patch_lifespan(monkeypatch)
 
     from server import ws_handler

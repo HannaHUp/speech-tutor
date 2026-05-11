@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import WebSocket, WebSocketDisconnect
 
 from server.latency_log import log_stage_latency, log_stt_divergence
+from server.prompt_builder import UserTurnContext
 from server.prosody import extract_prosody
 from server.session import Session
 from server.tts_pipeline import sentence_flush_loop
@@ -114,9 +115,16 @@ async def _run_turn(
 ) -> None:
     if stt_text is not None:
         log_stt_divergence(turn_id=turn_id, stt_text=stt_text, text=text)
+        turn_context = UserTurnContext.from_voice(
+            edited_text=text,
+            stt_text=stt_text,
+            prosody=prosody,
+        )
+    else:
+        turn_context = UserTurnContext.from_text(text)
 
     try:
-        session.append_user(text, prosody)
+        session.append_user(turn_context)
         llm_messages = session.messages
         llm_user_message = llm_messages[-1]["content"] if llm_messages else ""
         turn_debug_logger.log(

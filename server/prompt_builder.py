@@ -3,6 +3,7 @@
 Borrowed from Hermes: agent/prompt_builder.py
 Verified deepwiki 2026-05-10.
 """
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
@@ -34,3 +35,41 @@ def build_user_turn_with_prosody(text: str, prosody: Mapping[str, str]) -> str:
         f"stress: {prosody.get('stress', '—')}",
     ]
     return f"{text}\n\n```prosody\n" + "\n".join(lines) + "\n```"
+
+
+@dataclass(frozen=True)
+class UserTurnContext:
+    """Normalized learner-turn context before rendering it into LLM text.
+
+    Phase 1 only sends the rendered content to the LLM. Keeping raw STT,
+    edited text, input source, and prosody together gives later persistence
+    and eval code one object to store or score instead of reconstructing it
+    from WebSocket events.
+    """
+
+    edited_text: str
+    source: str
+    stt_text: str | None = None
+    prosody: Mapping[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_voice(
+        cls,
+        *,
+        edited_text: str,
+        stt_text: str,
+        prosody: Mapping[str, str],
+    ) -> "UserTurnContext":
+        return cls(
+            edited_text=edited_text,
+            stt_text=stt_text,
+            prosody=dict(prosody),
+            source="voice",
+        )
+
+    @classmethod
+    def from_text(cls, edited_text: str) -> "UserTurnContext":
+        return cls(edited_text=edited_text, source="text")
+
+    def to_llm_content(self) -> str:
+        return build_user_turn_with_prosody(self.edited_text, self.prosody)

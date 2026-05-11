@@ -7,7 +7,7 @@ Verified deepwiki 2026-05-10.
 from typing import Mapping
 
 from server.config import Settings
-from server.prompt_builder import build_session_prompt, build_user_turn_with_prosody
+from server.prompt_builder import UserTurnContext, build_session_prompt
 
 
 class Session:
@@ -30,9 +30,21 @@ class Session:
     def messages(self) -> list[dict]:
         return list(self._messages)
 
-    def append_user(self, text: str, prosody: Mapping[str, str]) -> None:
-        self._messages.append(
-            {"role": "user", "content": build_user_turn_with_prosody(text, prosody)}
+    def append_user(self, turn: UserTurnContext) -> None:
+        self._messages.append({"role": "user", "content": turn.to_llm_content()})
+
+    def append_user_text(self, text: str) -> None:
+        self.append_user(UserTurnContext.from_text(text))
+
+    def append_user_voice(
+        self, *, edited_text: str, stt_text: str, prosody: Mapping[str, str]
+    ) -> None:
+        self.append_user(
+            UserTurnContext.from_voice(
+                edited_text=edited_text,
+                stt_text=stt_text,
+                prosody=prosody,
+            )
         )
 
     def append_assistant(self, text: str) -> None:
