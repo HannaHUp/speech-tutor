@@ -16,6 +16,7 @@ from server.latency_log import log_stage_latency, log_stt_divergence
 from server.prosody import extract_prosody
 from server.session import Session
 from server.tts_pipeline import sentence_flush_loop
+from server.turn_debug_log import TurnDebugLogger
 
 
 def _elapsed_ms(start: float) -> int:
@@ -60,6 +61,7 @@ async def _run_transcription(
     out_ws: _OutboundWS,
     executor: ThreadPoolExecutor,
     stt_provider: Any,
+    turn_debug_logger: TurnDebugLogger,
 ) -> tuple[str, list[dict], dict]:
     await _send_json(out_ws, {"type": "stt.running", "turn_id": turn_id})
 
@@ -67,6 +69,11 @@ async def _run_transcription(
     stt_task = asyncio.create_task(stt_provider.transcribe(audio, mime="audio/webm"))
     text, word_timestamps = await stt_task
     log_stage_latency(turn_id=turn_id, stage="stt", ms=_elapsed_ms(stt_start))
+    turn_debug_logger.log(
+        event="transcript_ready",
+        turn_id=turn_id,
+        extra={"stt_text": text},
+    )
 
     prosody_start = time.monotonic()
     loop = asyncio.get_running_loop()
@@ -81,6 +88,11 @@ async def _run_transcription(
     except Exception:
         prosody = {}
     log_stage_latency(turn_id=turn_id, stage="prosody", ms=_elapsed_ms(prosody_start))
+    turn_debug_logger.log(
+        event="prosody_extracted",
+        turn_id=turn_id,
+        extra={"stt_text": text, "prosody": prosody},
+    )
 
     await _send_json(
         out_ws, {"type": "transcript.ready", "turn_id": turn_id, "stt_text": text}
@@ -98,53 +110,94 @@ async def _run_turn(
     out_ws: _OutboundWS,
     llm_provider: Any,
     tts_provider: Any,
+    turn_debug_logger: TurnDebugLogger,
 ) -> None:
     if stt_text is not None:
         log_stt_divergence(turn_id=turn_id, stt_text=stt_text, text=text)
 
-    session.append_user(text, prosody)
-    text_queue: asyncio.Queue = asyncio.Queue()
-    assistant_parts: list[str] = []
+    try:
+        session.append_user(text, prosody)
+        llm_messages = session.messages
+        llm_user_message = llm_messages[-1]["content"] if llm_messages else ""
+        turn_debug_logger.log(
+            event="llm_input",
+            turn_id=turn_id,
+            extra={
+                "stt_text": stt_text,
+                "edited_text": text,
+                "prosody": prosody,
+                "llm_system_prompt": session.system_prompt,
+                "llm_user_message": llm_user_message,
+                "llm_messages": llm_messages,
+            },
+        )
 
-    async def stream_llm() -> None:
-        first_delta_at: float | None = None
-        llm_start = time.monotonic()
-        async for delta in llm_provider.stream(session.system_prompt, session.messages):
-            if first_delta_at is None:
-                first_delta_at = time.monotonic()
-                log_stage_latency(
+        text_queue: asyncio.Queue = asyncio.Queue()
+        assistant_parts: list[str] = []
+
+        async def stream_llm() -> None:
+            first_delta_at: float | None = None
+            llm_start = time.monotonic()
+            async for delta in llm_provider.stream(session.system_prompt, llm_messages):
+                if first_delta_at is None:
+                    first_delta_at = time.monotonic()
+                    log_stage_latency(
+                        turn_id=turn_id,
+                        stage="llm_ttft",
+                        ms=int((first_delta_at - llm_start) * 1000),
+                    )
+                assistant_parts.append(delta)
+                turn_debug_logger.log(
+                    event="llm_delta",
                     turn_id=turn_id,
-                    stage="llm_ttft",
-                    ms=int((first_delta_at - llm_start) * 1000),
+                    extra={"delta": delta},
                 )
-            assistant_parts.append(delta)
-            await _send_json(
-                out_ws, {"type": "llm.delta", "turn_id": turn_id, "text": delta}
-            )
-            await text_queue.put(delta)
-        await text_queue.put(None)
+                await _send_json(
+                    out_ws, {"type": "llm.delta", "turn_id": turn_id, "text": delta}
+                )
+                await text_queue.put(delta)
+            await text_queue.put(None)
 
-    first_sentence_start = time.monotonic()
-    llm_task = asyncio.create_task(stream_llm())
-    chunks = await sentence_flush_loop(
-        text_queue,
-        out_ws,
-        turn_id=turn_id,
-        tts=tts_provider,
-    )
-    await llm_task
-    log_stage_latency(
-        turn_id=turn_id,
-        stage="llm_first_sentence",
-        ms=_elapsed_ms(first_sentence_start),
-    )
-    if chunks:
-        log_stage_latency(turn_id=turn_id, stage="tts_first_chunk", ms=0)
-    session.append_assistant("".join(assistant_parts))
-    await _send_json(
-        out_ws, {"type": "tts.done", "turn_id": turn_id, "total_chunks": chunks}
-    )
-    await _send_json(out_ws, {"type": "turn.done", "turn_id": turn_id})
+        first_sentence_start = time.monotonic()
+        llm_task = asyncio.create_task(stream_llm())
+        chunks = await sentence_flush_loop(
+            text_queue,
+            out_ws,
+            turn_id=turn_id,
+            tts=tts_provider,
+            turn_debug_logger=turn_debug_logger,
+        )
+        await llm_task
+        log_stage_latency(
+            turn_id=turn_id,
+            stage="llm_first_sentence",
+            ms=_elapsed_ms(first_sentence_start),
+        )
+        if chunks:
+            log_stage_latency(turn_id=turn_id, stage="tts_first_chunk", ms=0)
+        assistant_text = "".join(assistant_parts)
+        turn_debug_logger.log(
+            event="llm_complete",
+            turn_id=turn_id,
+            extra={"assistant_text": assistant_text},
+        )
+        session.append_assistant(assistant_text)
+        await _send_json(
+            out_ws, {"type": "tts.done", "turn_id": turn_id, "total_chunks": chunks}
+        )
+        turn_debug_logger.log(
+            event="turn_done",
+            turn_id=turn_id,
+            extra={"assistant_text": assistant_text, "tts_chunk_count": chunks},
+        )
+        await _send_json(out_ws, {"type": "turn.done", "turn_id": turn_id})
+    except Exception as exc:
+        turn_debug_logger.log(
+            event="turn_failed",
+            turn_id=turn_id,
+            extra={"error": f"{exc.__class__.__name__}: {exc}"},
+        )
+        raise
 
 
 async def websocket_endpoint(ws: WebSocket) -> None:
@@ -164,6 +217,11 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     last_stt_text: str | None = None
     last_prosody: dict = {}
     current_task: asyncio.Task | None = None
+    turn_debug_logger: TurnDebugLogger = getattr(
+        app_state,
+        "turn_debug_logger",
+        TurnDebugLogger(enabled=False, path=None, include_system_prompt=False),
+    )
 
     try:
         while True:
@@ -183,6 +241,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 audio_chunks = []
                 last_stt_text = None
                 last_prosody = {}
+                turn_debug_logger.log(event="turn_started", turn_id=current_turn_id)
                 await _send_json(
                     out_ws, {"type": "turn.started", "turn_id": current_turn_id}
                 )
@@ -198,6 +257,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     out_ws=out_ws,
                     executor=executor,
                     stt_provider=app_state.stt_provider,
+                    turn_debug_logger=turn_debug_logger,
                 )
 
             elif event_type == "turn.send":
@@ -215,6 +275,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                         out_ws=out_ws,
                         llm_provider=app_state.llm_provider,
                         tts_provider=app_state.tts_provider,
+                        turn_debug_logger=turn_debug_logger,
                     )
                 )
 

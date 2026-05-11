@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     tts_voice: str = "nova"
     llm_impl: str = "openai"
     llm_model: str = "gpt-4o-mini"
+    debug_turn_log: bool = False
+    debug_turn_log_path: str = "debug/turns.jsonl"
+    debug_turn_log_include_system_prompt: bool = False
     pronunciation_enabled: bool = False
     ffmpeg_path: str | None = None
     openai_api_key: SecretStr

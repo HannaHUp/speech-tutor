@@ -22,6 +22,7 @@ from server.providers import (
     get_stt_provider,
     get_tts_provider,
 )
+from server.turn_debug_log import TurnDebugLogger
 from server.ws_handler import websocket_endpoint
 
 
@@ -56,6 +57,7 @@ async def lifespan(app: FastAPI):
     app.state.tts_provider = get_tts_provider(settings)
     app.state.llm_provider = get_llm_provider(settings)
     app.state.pronunciation_provider = get_pronunciation_provider(settings)
+    app.state.turn_debug_logger = TurnDebugLogger.from_settings(settings)
     app.state.executor = ThreadPoolExecutor(max_workers=4)
     try:
         yield

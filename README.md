@@ -149,6 +149,14 @@ STT_IMPL=faster_whisper
 TTS_IMPL=edge
 ```
 
+Optional structured turn debug log:
+
+```text
+DEBUG_TURN_LOG=true
+DEBUG_TURN_LOG_PATH=debug/turns.jsonl
+DEBUG_TURN_LOG_INCLUDE_SYSTEM_PROMPT=false
+```
+
 After changing provider settings in `.env`, restart the Python backend.
 
 4. Install Python dependencies:
@@ -267,6 +275,60 @@ So if you see:
 ```
 
 that means the prosody step executed for turn 3, but it does not by itself prove what metadata was extracted.
+
+## Structured Debug Turn Log
+
+For turn-by-turn backend inspection, you can enable an opt-in JSON Lines debug log written by the Python server:
+
+```text
+DEBUG_TURN_LOG=true
+DEBUG_TURN_LOG_PATH=debug/turns.jsonl
+```
+
+Optional:
+
+```text
+DEBUG_TURN_LOG_INCLUDE_SYSTEM_PROMPT=true
+```
+
+Behavior:
+
+- the file defaults to `debug/turns.jsonl` relative to the repo root
+- parent directories are created automatically
+- the backend appends one JSON object per line
+- existing stdout latency logs stay unchanged
+
+Typical events include:
+
+- `turn_started`
+- `transcript_ready`
+- `prosody_extracted`
+- `llm_input`
+- `llm_delta`
+- `llm_complete`
+- `tts_chunk_meta`
+- `turn_done`
+- `turn_failed`
+
+Typical fields include:
+
+- `event`, `turn_id`, `ts`
+- `stt_text`
+- `edited_text`
+- `prosody`
+- `llm_user_message`
+- `llm_messages`
+- `delta`
+- `assistant_text`
+- `tts_chunk_count`
+- `error`
+
+If `DEBUG_TURN_LOG_INCLUDE_SYSTEM_PROMPT=true`, `llm_input` records also include `llm_system_prompt`.
+
+Sensitive content warning:
+
+- this log may contain raw transcripts, edited user text, prosody metadata, full LLM user-message content, message history, and final assistant output
+- do not enable it in environments where logging that content would be inappropriate
 
 ## Troubleshooting
 

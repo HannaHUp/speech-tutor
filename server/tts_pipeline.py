@@ -11,7 +11,7 @@ Verified deepwiki 2026-05-10.
 import asyncio
 import json
 import re
-from typing import Protocol
+from typing import Any, Protocol
 
 
 # Hermes borrow: tools/tts_tool.py::_SENTENCE_BOUNDARY_RE (verbatim)
@@ -68,7 +68,13 @@ class _WSLike(Protocol):
 
 
 async def send_tts_chunk(
-    ws: _WSLike, *, turn_id: int, seq: int, sentence_idx: int, mp3_bytes: bytes
+    ws: _WSLike,
+    *,
+    turn_id: int,
+    seq: int,
+    sentence_idx: int,
+    mp3_bytes: bytes,
+    turn_debug_logger: Any | None = None,
 ) -> None:
     """Send JSON metadata followed by the paired binary MP3 frame."""
     meta = {
@@ -79,6 +85,18 @@ async def send_tts_chunk(
         "mime": "audio/mpeg",
         "bytes": len(mp3_bytes),
     }
+    if turn_debug_logger is not None:
+        turn_debug_logger.log(
+            event="tts_chunk_meta",
+            turn_id=turn_id,
+            extra={
+                "seq": seq,
+                "sentence_idx": sentence_idx,
+                "mime": meta["mime"],
+                "bytes": meta["bytes"],
+                "tts_chunk_count": seq + 1,
+            },
+        )
     await ws.send_text(json.dumps(meta))
     await ws.send_bytes(mp3_bytes)
 
@@ -91,13 +109,19 @@ async def _flush_sentence(
     seq: int,
     sentence_idx: int,
     tts: _TTSLike,
+    turn_debug_logger: Any | None = None,
 ) -> bool:
     cleaned = _strip_markdown_for_tts(sentence)
     if not cleaned:
         return False
     mp3 = await tts.synthesize_sentence(cleaned)
     await send_tts_chunk(
-        ws, turn_id=turn_id, seq=seq, sentence_idx=sentence_idx, mp3_bytes=mp3
+        ws,
+        turn_id=turn_id,
+        seq=seq,
+        sentence_idx=sentence_idx,
+        mp3_bytes=mp3,
+        turn_debug_logger=turn_debug_logger,
     )
     return True
 
@@ -108,6 +132,7 @@ async def sentence_flush_loop(
     *,
     turn_id: int,
     tts: _TTSLike,
+    turn_debug_logger: Any | None = None,
 ) -> int:
     """Drain text deltas and emit per-sentence TTS JSON+binary frame pairs.
 
@@ -131,6 +156,7 @@ async def sentence_flush_loop(
                         seq=seq,
                         sentence_idx=sentence_idx,
                         tts=tts,
+                        turn_debug_logger=turn_debug_logger,
                     )
                     if flushed:
                         sentence_idx += 1
@@ -158,6 +184,7 @@ async def sentence_flush_loop(
                     seq=seq,
                     sentence_idx=sentence_idx,
                     tts=tts,
+                    turn_debug_logger=turn_debug_logger,
                 )
                 if flushed:
                     seq += 1
