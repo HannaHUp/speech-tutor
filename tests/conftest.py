@@ -16,7 +16,8 @@ def dummy_settings():
     m.stt_impl = "openai"
     m.tts_impl = "openai"
     m.tts_voice = "nova"
-    m.llm_model = "claude-haiku-4-5-20251001"
+    m.llm_impl = "openai"
+    m.llm_model = "gpt-4o-mini"
     m.pronunciation_enabled = False
     m.openai_api_key = "sk-test"
     m.anthropic_api_key = "sk-ant-test"

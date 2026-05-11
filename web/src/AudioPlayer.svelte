@@ -18,8 +18,37 @@
   let sourceBuffer: SourceBuffer | null = null;
   let objectUrl: string | null = null;
   let unsubscribeBinary: (() => void) | null = null;
+  let unsubscribeDone: (() => void) | null = null;
+  let unsubscribeTurnStart: (() => void) | null = null;
   let started = false;
+  let streamDone = false;
   const pendingChunks: ArrayBuffer[] = [];
+
+  function handlePlaybackEnded() {
+    onPlayEnd();
+    started = false;
+    streamDone = false;
+    setupMediaSource();
+  }
+
+  function maybeFinishStream() {
+    if (
+      !streamDone ||
+      !mediaSource ||
+      mediaSource.readyState !== "open" ||
+      !sourceBuffer ||
+      sourceBuffer.updating ||
+      pendingChunks.length > 0
+    ) {
+      return;
+    }
+    mediaSource.endOfStream();
+  }
+
+  function handleSourceBufferUpdateEnd() {
+    drain();
+    maybeFinishStream();
+  }
 
   function drain() {
     if (!sourceBuffer || sourceBuffer.updating || pendingChunks.length === 0) return;
@@ -37,42 +66,78 @@
     }
   }
 
+  function handleSourceOpen() {
+    if (!mediaSource) return;
+    sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+    sourceBuffer.addEventListener("updateend", handleSourceBufferUpdateEnd);
+    drain();
+  }
+
+  function teardownMediaSource() {
+    if (sourceBuffer) {
+      sourceBuffer.removeEventListener("updateend", handleSourceBufferUpdateEnd);
+    }
+    sourceBuffer = null;
+    if (mediaSource) {
+      mediaSource.removeEventListener("sourceopen", handleSourceOpen);
+    }
+    mediaSource = null;
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    objectUrl = null;
+  }
+
+  function setupMediaSource() {
+    if (!audioEl || !codecOk) return;
+    teardownMediaSource();
+    mediaSource = new MediaSource();
+    objectUrl = URL.createObjectURL(mediaSource);
+    audioEl.src = objectUrl;
+    mediaSource.addEventListener("sourceopen", handleSourceOpen);
+  }
+
   onMount(() => {
     if (!("MediaSource" in window) || !MediaSource.isTypeSupported("audio/mpeg")) {
       codecOk = false;
       return;
     }
     if (!audioEl) return;
-
-    mediaSource = new MediaSource();
-    objectUrl = URL.createObjectURL(mediaSource);
-    audioEl.src = objectUrl;
-    audioEl.addEventListener("ended", onPlayEnd);
-
-    mediaSource.addEventListener("sourceopen", () => {
-      if (!mediaSource) return;
-      sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-      sourceBuffer.addEventListener("updateend", drain);
-      drain();
-    });
+    audioEl.addEventListener("ended", handlePlaybackEnded);
+    setupMediaSource();
   });
 
   $effect(() => {
     unsubscribeBinary?.();
+    unsubscribeDone?.();
+    unsubscribeTurnStart?.();
     unsubscribeBinary = null;
+    unsubscribeDone = null;
+    unsubscribeTurnStart = null;
     if (ws) {
       unsubscribeBinary = ws.onBinary((bytes) => {
+        if (!mediaSource || mediaSource.readyState === "ended") {
+          setupMediaSource();
+        }
         pendingChunks.push(bytes);
         drain();
+      });
+      unsubscribeDone = ws.on("tts.done", () => {
+        streamDone = true;
+        maybeFinishStream();
+      });
+      unsubscribeTurnStart = ws.on("turn.started", () => {
+        streamDone = false;
       });
     }
   });
 
   onDestroy(() => {
     unsubscribeBinary?.();
-    sourceBuffer?.removeEventListener("updateend", drain);
-    audioEl?.removeEventListener("ended", onPlayEnd);
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    unsubscribeDone?.();
+    unsubscribeTurnStart?.();
+    audioEl?.removeEventListener("ended", handlePlaybackEnded);
+    teardownMediaSource();
   });
 </script>
 

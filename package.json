@@ -1,0 +1,9 @@
+{
+  "name": "hermes-speech-tutor",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix web run build",
+    "dev": "npm --prefix web run dev",
+    "preview": "npm --prefix web run preview"
+  }
+}

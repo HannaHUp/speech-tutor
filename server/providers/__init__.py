@@ -3,8 +3,8 @@
 # Adapted from Hermes: tools/transcription_tools.py::_get_provider
 # Hermes returns string keys and auto-detects. We return concrete provider
 # objects and raise ValueError on unknown (no auto-detect, per D-16).
-# Verified deepwiki 2026-05-10.
 """
+
 from server.config import Settings
 
 from .pronunciation_null import NullPronunciationProvider
@@ -50,9 +50,19 @@ def get_tts_provider(settings: Settings) -> TTSProvider:
 
 
 def get_llm_provider(settings: Settings) -> LLMProvider:
-    from .llm_anthropic import AnthropicLLM
+    if settings.llm_impl == "openai":
+        from .llm_openai import OpenAILLM
 
-    return AnthropicLLM(settings)
+        return OpenAILLM(settings)
+    elif settings.llm_impl == "anthropic":
+        from .llm_anthropic import AnthropicLLM
+
+        return AnthropicLLM(settings)
+    else:
+        raise ValueError(
+            f"Unknown LLM_IMPL={settings.llm_impl!r}. "
+            f"Valid values: openai, anthropic"
+        )
 
 
 def get_pronunciation_provider(settings: Settings) -> PronunciationProvider:

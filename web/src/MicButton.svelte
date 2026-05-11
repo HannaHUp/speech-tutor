@@ -18,7 +18,7 @@
   let recorder: MediaRecorder | null = null;
   let stream: MediaStream | null = null;
   let activeTurnId: number | null = null;
-  let frameSeq = 0;
+  let recordedChunks: Blob[] = [];
 
   async function startRecording() {
     if (!ws || recording || disabled) return;
@@ -30,22 +30,27 @@
 
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
-      frameSeq = 0;
+      recordedChunks = [];
       recording = true;
 
       recorder.ondataavailable = (event) => {
-        const id = activeTurnId ?? turnId;
-        if (!ws || id == null || event.data.size === 0) return;
-        ws.send({ type: "audio.frame", turn_id: id, seq: frameSeq++ });
-        event.data.arrayBuffer().then((buffer) => ws?.sendBytes(buffer));
+        if (event.data.size === 0) return;
+        recordedChunks = [...recordedChunks, event.data];
       };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
+        const id = activeTurnId ?? turnId;
+        if (ws && id != null && recordedChunks.length > 0) {
+          const blob = new Blob(recordedChunks, { type: recorder?.mimeType || "audio/webm" });
+          ws.send({ type: "audio.frame", turn_id: id, seq: 0 });
+          ws.sendBytes(await blob.arrayBuffer());
+        }
         ws?.send({ type: "turn.stop" });
         stream?.getTracks().forEach((track) => track.stop());
         stream = null;
+        recordedChunks = [];
         recording = false;
       };
-      recorder.start(250);
+      recorder.start();
     } catch (error) {
       console.error("getUserMedia failed", error);
       stream?.getTracks().forEach((track) => track.stop());

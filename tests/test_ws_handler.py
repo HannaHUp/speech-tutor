@@ -10,16 +10,40 @@ def test_ffmpeg_missing_exits(monkeypatch, capsys):
 
     monkeypatch.setattr(shutil, "which", lambda _: None)
     from server.main import check_ffmpeg
+    from server.config import Settings
 
     with pytest.raises(SystemExit) as exc:
-        check_ffmpeg()
+        check_ffmpeg(
+            Settings(
+                _env_file=None,
+                openai_api_key="sk-test",
+                ffmpeg_path=None,
+            )
+        )
     assert exc.value.code == 1
     captured = capsys.readouterr()
     assert "winget install Gyan.FFmpeg" in captured.err
     assert "ffmpeg not found" in captured.err
 
 
-def test_settings_missing_api_key_raises(monkeypatch):
+def test_ffmpeg_path_override_allows_startup(monkeypatch):
+    import shutil
+
+    monkeypatch.setattr(shutil, "which", lambda _: None)
+    monkeypatch.setattr("pathlib.Path.is_file", lambda self: True)
+    from server.main import check_ffmpeg
+    from server.config import Settings
+
+    check_ffmpeg(
+        Settings(
+            _env_file=None,
+            openai_api_key="sk-test",
+            ffmpeg_path=r"C:\tools\ffmpeg\bin\ffmpeg.exe",
+        )
+    )
+
+
+def test_settings_missing_openai_api_key_raises(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
@@ -28,6 +52,41 @@ def test_settings_missing_api_key_raises(monkeypatch):
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_settings_allows_default_llm_with_only_openai_key(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-visible-secret")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    from server.config import Settings
+
+    settings = Settings(_env_file=None)
+
+    assert settings.llm_impl == "openai"
+    assert settings.openai_api_key.get_secret_value() == "sk-visible-secret"
+
+
+def test_settings_reads_repo_env_independent_of_cwd(monkeypatch):
+    monkeypatch.chdir("web")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    from server.config import Settings
+
+    settings = Settings()
+
+    assert settings.openai_api_key.get_secret_value().startswith("sk-")
+
+
+def test_settings_requires_anthropic_key_only_for_anthropic_llm(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-visible-secret")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    from pydantic import ValidationError
+    from server.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, llm_impl="anthropic")
 
 
 def test_settings_api_keys_are_redacted(monkeypatch):
@@ -42,6 +101,16 @@ def test_settings_api_keys_are_redacted(monkeypatch):
     assert "sk-ant-visible-secret" not in repr(settings)
     assert "**********" in repr(settings)
     assert settings.openai_api_key.get_secret_value() == "sk-visible-secret"
+
+
+def test_uvicorn_can_import_fastapi_app():
+    from uvicorn.importer import import_from_string
+
+    loaded = import_from_string("server.main:app")
+
+    from server.main import app
+
+    assert loaded is app
 
 
 def test_turn_send_carries_both_stt_text_and_text():
@@ -124,7 +193,6 @@ def _patch_lifespan(monkeypatch):
     monkeypatch.setattr(main, "get_llm_provider", lambda settings: _FakeLLM())
     monkeypatch.setattr(main, "get_pronunciation_provider", lambda settings: object())
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     return main.app, stt
 
 

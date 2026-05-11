@@ -21,6 +21,33 @@ def test_factory_raises_on_unknown_tts_impl(dummy_settings):
         get_tts_provider(dummy_settings)
 
 
+def test_factory_uses_openai_llm_by_default(dummy_settings):
+    from server.providers import get_llm_provider
+    from server.providers.llm_openai import OpenAILLM
+
+    provider = get_llm_provider(dummy_settings)
+
+    assert isinstance(provider, OpenAILLM)
+
+
+def test_factory_uses_anthropic_llm_when_selected(dummy_settings):
+    from server.providers import get_llm_provider
+    from server.providers.llm_anthropic import AnthropicLLM
+
+    dummy_settings.llm_impl = "anthropic"
+    provider = get_llm_provider(dummy_settings)
+
+    assert isinstance(provider, AnthropicLLM)
+
+
+def test_factory_raises_on_unknown_llm_impl(dummy_settings):
+    from server.providers import get_llm_provider
+
+    dummy_settings.llm_impl = "nonsense"
+    with pytest.raises(ValueError, match="Unknown LLM_IMPL"):
+        get_llm_provider(dummy_settings)
+
+
 def test_null_pronunciation_returns_disabled(dummy_settings):
     from server.providers import NullPronunciationProvider, get_pronunciation_provider
     from server.providers.protocols import PronunciationProvider
@@ -180,3 +207,58 @@ def test_anthropic_llm_satisfies_protocol(dummy_settings):
     from server.providers.protocols import LLMProvider
 
     assert isinstance(AnthropicLLM(dummy_settings), LLMProvider)
+
+
+@pytest.mark.asyncio
+async def test_openai_llm_yields_text_deltas(dummy_settings):
+    import server.providers.llm_openai as mod
+
+    chunks = [
+        MagicMock(choices=[MagicMock(delta=MagicMock(content="Hello "))]),
+        MagicMock(choices=[MagicMock(delta=MagicMock(content="world."))]),
+        MagicMock(choices=[MagicMock(delta=MagicMock(content=None))]),
+    ]
+
+    class FakeStream:
+        def __aiter__(self):
+            async def gen():
+                for chunk in chunks:
+                    yield chunk
+
+            return gen()
+
+    class FakeCompletions:
+        async def create(self, **kwargs):
+            self.last_kwargs = kwargs
+            return FakeStream()
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = FakeCompletions()
+
+    class FakeClient:
+        def __init__(self):
+            self.chat = FakeChat()
+
+    llm = mod.OpenAILLM(dummy_settings)
+    llm._client = FakeClient()
+
+    collected = []
+    async for text in llm.stream("SYSTEM PREFIX", [{"role": "user", "content": "Hi"}]):
+        collected.append(text)
+
+    assert collected == ["Hello ", "world."]
+    kwargs = llm._client.chat.completions.last_kwargs
+    assert kwargs["model"] == dummy_settings.llm_model
+    assert kwargs["stream"] is True
+    assert kwargs["messages"] == [
+        {"role": "system", "content": "SYSTEM PREFIX"},
+        {"role": "user", "content": "Hi"},
+    ]
+
+
+def test_openai_llm_satisfies_protocol(dummy_settings):
+    from server.providers.llm_openai import OpenAILLM
+    from server.providers.protocols import LLMProvider
+
+    assert isinstance(OpenAILLM(dummy_settings), LLMProvider)

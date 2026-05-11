@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "hermes-speech-tutor"
 version = "0.1.0"
@@ -29,3 +33,6 @@ markers = [
     "integration: slow tests that hit real providers (excluded from quick run)",
     "manual: tests that require microphone or pre-recorded wav input",
 ]
+
+[tool.setuptools.packages.find]
+include = ["server", "server.*"]

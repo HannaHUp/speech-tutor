@@ -1,8 +1,9 @@
+import os
 """Hermes Speech Tutor - FastAPI entry point.
 
 Lifespan order (D-18):
-  1. check_ffmpeg() - fail fast with winget message if missing
-  2. Settings() - pydantic-settings validates config + API keys
+  1. Settings() - pydantic-settings validates config + API keys
+  2. check_ffmpeg(settings) - fail fast with winget message if missing
   3. app ready to serve
 """
 import shutil
@@ -24,14 +25,20 @@ from server.providers import (
 from server.ws_handler import websocket_endpoint
 
 
-def check_ffmpeg() -> None:
+def check_ffmpeg(settings: Settings) -> None:
     """D-18 startup ffmpeg check.
 
     Phase 1 exit section 8 makes this a hard gate.
     """
+    ffmpeg_override = settings.ffmpeg_path or os.environ.get("FFMPEG_PATH")
+    if ffmpeg_override:
+        ffmpeg_path = Path(ffmpeg_override).expanduser()
+        if ffmpeg_path.is_file():
+            return
     if shutil.which("ffmpeg") is None:
         print(
             "ERROR: ffmpeg not found on PATH.\n"
+            "Set FFMPEG_PATH in .env to the full ffmpeg.exe path if Windows PATH is inconsistent.\n"
             "Install via 'winget install Gyan.FFmpeg' (Windows) or "
             "'apt-get install ffmpeg' (Linux).\n"
             "Restart your shell after install.",
@@ -42,8 +49,8 @@ def check_ffmpeg() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    check_ffmpeg()
     settings = Settings()
+    check_ffmpeg(settings)
     app.state.settings = settings
     app.state.stt_provider = get_stt_provider(settings)
     app.state.tts_provider = get_tts_provider(settings)
