@@ -2,15 +2,20 @@
 
 ## Positioning
 
-This repository is a Phase 1 proof of concept, not a production speech tutor. It proves the hardest early technical loop:
+This repository is a Phase 1 proof of concept, not a production speech tutor. It validates two hard early voice-interaction paths:
 
-`browser mic -> STT -> LLM -> TTS -> playback`
+- Traditional speech pipeline:
+  `browser mic -> STT -> editable transcript + prosody context -> LLM -> TTS -> playback`
+- Direct multimodal LLM route:
+  `browser mic -> multimodal LLM voice interaction -> playback`
 
-The current value is architectural evidence: provider seams, turn orchestration, editable transcripts, latency/debug hooks, and a session prompt boundary. The production work is still ahead.
+The current value is architectural evidence: provider seams, turn orchestration, editable transcripts, multimodal voice exploration, latency/debug hooks, and a session prompt boundary. The production work is still ahead.
 
 ## What Exists Today
 
 - A localhost FastAPI + Svelte speech loop over WebSocket.
+- A traditional STT -> LLM -> TTS voice pipeline.
+- A direct multimodal LLM voice route for end-to-end voice interaction.
 - Provider protocols for STT, LLM, TTS, and pronunciation analysis.
 - Two STT paths planned/implemented behind configuration, depending on local setup.
 - Two TTS paths planned/implemented behind configuration, depending on local setup.
@@ -91,12 +96,24 @@ Production direction:
 - Add visible failure states for STT, LLM, and TTS.
 - Keep push-to-talk until echo-loop risk is better characterized.
 
+### 7. Interaction-Path Product Choice Is Not Settled
+
+The prototype can validate both the traditional pipeline and a direct multimodal voice route, but production still needs a decision about which path is primary for tutoring. The traditional pipeline gives an explicit transcript surface for learner review and correction. The multimodal route may feel smoother, but it needs separate validation for transcript visibility, correction accuracy, cost, latency, and debuggability.
+
+Production direction:
+
+- Compare both paths with the same scripted learner turns.
+- Decide which path owns correction-heavy tutoring flows.
+- Keep explicit transcript visibility wherever correction pedagogy depends on what the learner actually said.
+- Track latency, cost, and failure modes separately for each path.
+
 ## Production Foundation Already Present
 
 - Provider interfaces reduce vendor lock-in and make cost/performance comparisons testable.
 - The turn protocol is explicit enough to persist later.
 - The frozen session prompt avoids accidental prompt drift mid-session.
 - The typed `UserTurnContext` keeps raw STT, edited text, source, and prosody together before rendering to the LLM.
+- The direct multimodal route gives a second interaction model to compare against the explicit pipeline.
 - Debug and latency hooks make the system observable enough for Phase 2/3 iteration.
 - The roadmap has concrete deferral triggers instead of vague "later" work.
 
@@ -110,4 +127,4 @@ Production direction:
 
 ## Honest Summary
 
-This repo is not production-ready. It is a credible production-minded prototype because it proves the speech loop, isolates provider dependencies, records useful turn diagnostics, and defines the next hardening steps without pretending they are already complete.
+This repo is not production-ready. It is a credible production-minded prototype because it validates both a traditional speech pipeline and a direct multimodal voice route, isolates provider dependencies, records useful turn diagnostics, and defines the next hardening steps without pretending they are already complete.

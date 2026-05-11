@@ -2,9 +2,12 @@
 
 Hermes Speech Tutor is an intentionally scoped **Phase 1 prototype** for a browser-based English speaking tutor.
 
-It proves a local voice loop:
+It validates two local voice interaction paths:
 
-`browser mic -> speech-to-text -> LLM response -> text-to-speech -> playback`
+- Traditional speech pipeline:
+  `browser mic -> speech-to-text -> editable transcript + prosody context -> LLM -> text-to-speech -> playback`
+- Direct multimodal LLM route:
+  `browser mic -> multimodal LLM voice interaction -> playback`
 
 This is not a production-ready tutor. It is a vertical slice built to show how I would validate the hardest core workflow first, then evolve it toward a production foundation.
 
@@ -20,14 +23,30 @@ This is not a production-ready tutor. It is a vertical slice built to show how I
 - `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY` only if `LLM_IMPL=anthropic`
 
-## Provider Modes
+## Interaction Paths
 
-This app is a pipelined voice loop, not a single realtime multimodal session:
+The prototype is intentionally comparing two ways to make a browser-based tutor feel conversational.
+
+Traditional speech pipeline:
 
 - browser records audio
 - STT transcribes the audio
-- LLM generates the tutor reply text
+- the learner can review or edit the transcript
+- prosody metadata is attached as text context when available
+- an LLM generates the tutor reply text
 - TTS synthesizes reply audio
+
+Direct multimodal LLM route:
+
+- browser audio is routed to a multimodal voice model
+- the model handles the voice interaction end-to-end
+- playback returns to the learner without separate STT and TTS provider hops
+
+The traditional pipeline keeps an explicit transcript boundary, which matters for language tutoring because the learner can see and correct what the system heard. The direct multimodal route tests whether a single model can provide a smoother voice interaction.
+
+## Provider Modes
+
+The traditional pipeline ships with paid and free/dev provider modes.
 
 By default, the backend uses the paid OpenAI-backed stack:
 
@@ -35,7 +54,7 @@ By default, the backend uses the paid OpenAI-backed stack:
 - `TTS_IMPL=openai`
 - `LLM_IMPL=openai`
 
-That means one spoken turn can incur three separate OpenAI-backed operations:
+That means one traditional-pipeline spoken turn can incur three separate OpenAI-backed operations:
 
 - speech-to-text
 - text generation
@@ -346,4 +365,3 @@ winget install Gyan.FFmpeg
 
 - Use `http://localhost:8000`, not `http://127.0.0.1:8000` or a LAN IP, for the browser mic flow.
 - If the page loads but the voice loop does not connect, make sure the backend is running and `web/dist` exists because FastAPI serves the built frontend.
-

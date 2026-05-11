@@ -4,9 +4,12 @@
 
 Hermes Speech Tutor is an intentionally scoped **Phase 1 prototype** for a browser-based English speaking tutor.
 
-It proves a local voice loop:
+It validates two local voice interaction paths that a real human can talk to on localhost:
 
-`browser mic -> speech-to-text -> LLM response -> text-to-speech -> playback`
+- Traditional speech pipeline:
+  `browser mic -> speech-to-text -> editable transcript + prosody context -> LLM -> text-to-speech -> playback`
+- Direct multimodal LLM route:
+  `browser mic -> multimodal LLM voice interaction -> playback`
 
 This is not a production-ready tutor. It is a vertical slice built to show how I would validate the hardest core workflow first, then evolve it toward a production foundation.
 ![alt text](image.png)
@@ -14,7 +17,12 @@ This is not a production-ready tutor. It is a vertical slice built to show how I
 
 - A learner can speak in the browser and hear a spoken tutor response.
 - The learner can edit the transcript before the LLM sees it.
-- STT, LLM, TTS, and pronunciation analysis are separated behind provider interfaces.
+- The traditional pipeline runs end-to-end with OpenAI STT, an LLM, and OpenAI TTS.
+- The direct multimodal route validates a single model handling voice interaction end-to-end.
+- A free/dev stack also runs end-to-end with local faster-whisper STT and edge-tts.
+- Two STT implementations and two TTS implementations ship behind Protocols, proving the abstraction is real instead of hypothetical.
+- Voice turns carry transcript, edited text, input source, and prosody context into the LLM prompt.
+- STT, LLM, TTS, and pronunciation scaffolding are separated behind provider interfaces.
 - The backend has an explicit WebSocket turn flow instead of a black-box request/response.
 - Prompt construction has a stable session boundary and typed user-turn context.
 - The app has early latency/debug hooks for inspecting what happened during a turn.
