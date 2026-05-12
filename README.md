@@ -7,7 +7,7 @@ Hermes Speech Tutor is an intentionally scoped **Phase 1 prototype** for a brows
 It validates two local voice interaction paths that a real human can talk to on localhost:
 
 - Traditional speech pipeline:
-  `browser mic -> STT (OpenAI STT or faster-whisper) -> editable transcript -> LLM -> TTS (OpenAI TTS or edge-tts) -> playback`
+  `browser mic -> STT (OpenAI STT or faster-whisper) -> raw transcript + optional recognition-error correction -> LLM -> TTS (OpenAI TTS or edge-tts) -> playback`
 - Direct multimodal LLM route:
   `browser mic -> multimodal LLM voice interaction -> playback`
 
@@ -16,13 +16,13 @@ This is not a production-ready tutor. It is a vertical slice built to show how I
 ## What The Prototype Proves
 
 - A learner can speak in the browser and hear a spoken tutor response.
-- The learner can edit the transcript before the LLM sees it.
+- The learner can correct speech-recognition errors while the system preserves the raw transcript for speaking feedback.
 - The traditional pipeline runs end-to-end with swappable STT and TTS providers.
-- Paid default: `browser mic -> OpenAI STT -> editable transcript -> OpenAI LLM -> OpenAI TTS -> playback`.
-- Free/dev: `browser mic -> faster-whisper -> editable transcript -> OpenAI LLM -> edge-tts -> playback`.
+- Paid default: `browser mic -> OpenAI STT -> raw transcript + optional recognition-error correction -> OpenAI LLM -> OpenAI TTS -> playback`.
+- Free/dev: `browser mic -> faster-whisper -> raw transcript + optional recognition-error correction -> OpenAI LLM -> edge-tts -> playback`.
 - The direct multimodal route validates a single model handling voice interaction end-to-end.
 - Two STT implementations and two TTS implementations ship behind Protocols, proving the abstraction is real instead of hypothetical.
-- Voice turns carry transcript, edited text, input source, and prosody context into the LLM prompt.
+- Voice turns carry raw transcript, corrected meaning, input source, and prosody context into the LLM prompt.
 - STT, LLM, TTS, and pronunciation scaffolding are separated behind provider interfaces.
 - The backend has an explicit WebSocket turn flow instead of a black-box request/response.
 - Prompt construction has a stable session boundary and typed user-turn context.
@@ -58,7 +58,8 @@ The repo is meant to show engineering judgment more than feature breadth.
 2. Version prompt components and add a real tutor policy for correction behavior.
 3. Build evals for false-positive corrections, STT normalization, latency, role-play adherence, and tutor tone.
 4. Add privacy, retention, and consent rules before storing learner data.
-5. Dogfood with real L2 learners before claiming tutor quality.
+5. Add Personalized Practice Starters that turn curriculum goals, learner history, and correction patterns into tailored speaking prompts.
+6. Dogfood with real L2 learners before claiming tutor quality.
 
 ## Suggested Review Path
 
@@ -71,6 +72,7 @@ If you want more detail:
 - `PROMPT_ARCHITECTURE.md` explains the prompt/context strategy.
 - `MEMORY_AND_STATE_STRATEGY.md` outlines how learner/session state should evolve.
 - `EVAL_STRATEGY.md` describes what should be measured before calling this a real tutor.
+- `PERSONALIZED_PRACTICE_STARTERS.md` explains a future curriculum-aware personalization feature inspired by conversation-starter research.
 
 ## Summary
 
