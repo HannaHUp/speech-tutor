@@ -4,19 +4,15 @@ Browser-based AI speech tutor prototype with explicit voice-turn orchestration, 
 
 ## From MVP To Production
 
-- **Current MVP:** two browser voice paths: an explicit `STT -> LLM -> TTS` pipeline with transcript review, and a direct multimodal voice route.
+- **Current MVP:** a browser voice path built around an explicit `STT -> LLM -> TTS` pipeline with transcript review.
 - **Production direction:** **Personalized Practice Starters**, a retrieval-backed personalization layer that turns learner history, correction patterns, session summaries, curriculum goals, and lesson content into targeted speaking tasks.
 
 ## What It Does Today
 
-Hermes validates two local voice interaction paths:
+Hermes validates the core voice interaction path:
 
 ```text
-Traditional pipeline:
 browser mic -> STT -> transcript review -> LLM -> TTS -> playback
-
-Direct multimodal route:
-browser mic -> multimodal LLM voice interaction -> playback
 ```
 
 The most important design choice is that Hermes preserves the **raw STT transcript** separately from the learner's **corrected meaning**. That lets the tutor use the corrected text for conversation while keeping the original spoken evidence available for future pronunciation, fluency, and correction analysis.
@@ -31,7 +27,7 @@ A speech tutor needs to reason about:
 
 - what the learner actually said
 - what the speech recognizer may have misheard
-- whether the explicit STT -> LLM -> TTS pipeline or a direct multimodal voice model should own a given tutoring flow
+- whether future direct multimodal voice models should replace, supplement, or stay separate from the explicit pipeline
 - which provider should handle STT, LLM, TTS, and pronunciation
 - what learner data is safe to store and retrieve
 - how prompts, correction policy, latency, privacy, and evals evolve after MVP
@@ -39,10 +35,6 @@ A speech tutor needs to reason about:
 Hermes is intentionally scoped as a Phase 1 architecture slice: prove the hard speech loop first, then add tutoring intelligence, learner memory, and curriculum-aware personalization on top of a working system.
 
 ## Current Architecture
-
-Hermes keeps the traditional pipeline and direct multimodal route visible as separate architecture choices.
-
-### Traditional Pipeline
 
 The backend owns the explicit `STT -> LLM -> TTS` voice-turn flow over WebSocket instead of hiding it behind a black-box chatbot request.
 
@@ -62,17 +54,22 @@ turn.start
 
 That explicit turn model makes latency, debugging, cancellation, transcript correction, and future persistence easier to reason about.
 
-### Direct Multimodal Route
+## Why Not Direct Multimodal Voice First?
 
-The direct multimodal route sends browser audio into a multimodal voice model and returns spoken playback without separate STT and TTS provider hops.
+Direct multimodal voice models are attractive because they can make a voice app feel smoother: fewer provider hops, lower perceived friction, and a more natural back-and-forth loop.
 
-```text
-browser mic
-  -> multimodal LLM voice interaction
-  -> playback
-```
+For a speech tutor, the first production risk is different. The tutor needs to know what the learner actually said, what the speech recognizer may have misheard, and whether feedback is based on learner speech or system noise. That makes an explicit pipeline a better first architecture:
 
-This route is useful as a product and architecture comparison point. It may offer a smoother interaction loop, while the traditional pipeline gives Hermes stronger transcript visibility, correction review, provider-level control, and debuggability. A production tutor may keep both paths if they serve different modes: direct voice for low-friction conversation, explicit pipeline for correction-heavy tutoring where raw transcript evidence matters.
+- **Transcript visibility:** the learner can see what the system heard before the tutor responds.
+- **Recognition-error correction:** the learner can fix STT mistakes without losing the raw transcript.
+- **Feedback safety:** future correction logic can compare raw STT, corrected meaning, audio, and prosody instead of trusting one opaque model response.
+- **Provider control:** STT, LLM, TTS, and pronunciation can be swapped independently for cost, latency, quality, privacy, or reliability.
+- **Evaluation:** tutor-quality evals can inspect each stage instead of treating the whole voice turn as a black box.
+- **Privacy decisions:** audio, transcripts, corrected text, and debug logs can each get separate retention and consent rules.
+
+A direct multimodal route may still be the right choice for some production modes. I would evaluate it for low-friction conversation practice, latency-sensitive back-and-forth, or learners who do not need transcript review on every turn. I would be more cautious using it for correction-heavy tutoring unless it can expose enough transcript, timing, and reasoning evidence to support feedback quality, debugging, privacy review, and evals.
+
+The evaluation plan for that decision is in `eval-multimodal.md`.
 
 ## Implemented Provider Strategy
 
@@ -91,7 +88,6 @@ This keeps provider selection as an architectural decision instead of something 
 
 - A learner can speak in the browser and hear a spoken tutor response.
 - The traditional voice pipeline works end to end: mic capture, STT, transcript review, LLM response, TTS, and playback.
-- The direct multimodal route gives a second interaction model to compare against the explicit pipeline.
 - A learner can correct speech-recognition errors while Hermes preserves the raw transcript.
 - OpenAI and faster-whisper STT run behind the same interface.
 - OpenAI TTS and edge-tts run behind the same interface.
@@ -159,7 +155,7 @@ Planned production work:
 4. Build Personalized Practice Starters as the first retrieval-backed personalization feature.
 5. Version prompt components and store prompt versions with sessions.
 6. Add evals for false-positive corrections, STT normalization, latency, role-play adherence, starter quality, and tutor tone.
-7. Compare the explicit pipeline and direct multimodal route on transcript visibility, correction quality, cost, latency, privacy, and debuggability.
+7. Evaluate whether a future direct multimodal voice route should coexist with the explicit pipeline, using transcript visibility, correction quality, cost, latency, privacy, and debuggability as decision criteria.
 8. Add privacy, consent, retention, redaction, and deletion rules before storing learner history.
 9. Dogfood with real L2 learners before claiming pedagogical effectiveness.
 
@@ -242,6 +238,7 @@ Start here, then read the deeper docs based on what you want to inspect:
 - `PROMPT_ARCHITECTURE.md` for prompt/session design.
 - `MEMORY_AND_STATE_STRATEGY.md` for learner memory and persistence direction.
 - `EVAL_STRATEGY.md` for evaluation strategy.
+- `eval-multimodal.md` for deciding when direct multimodal voice is safe for correction-heavy tutoring.
 - `PRODUCTION_GAP_ANALYSIS.md` for the gap between this prototype and production.
 - `PERSONALIZED_PRACTICE_STARTERS.md` for the production personalization/RAG feature.
 

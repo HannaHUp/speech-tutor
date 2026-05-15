@@ -2,12 +2,9 @@
 
 Hermes Speech Tutor is an intentionally scoped **Phase 1 prototype** for a browser-based English speaking tutor.
 
-It validates two local voice interaction paths:
+It validates the core local voice interaction path:
 
-- Traditional speech pipeline:
-  `browser mic -> STT (OpenAI STT or faster-whisper) -> editable transcript -> LLM -> TTS (OpenAI TTS or edge-tts) -> playback`
-- Direct multimodal LLM route:
-  `browser mic -> multimodal LLM voice interaction -> playback`
+`browser mic -> STT (OpenAI STT or faster-whisper) -> editable transcript -> LLM -> TTS (OpenAI TTS or edge-tts) -> playback`
 
 This is not a production-ready tutor. It is a vertical slice built to show how I would validate the hardest core workflow first, then evolve it toward a production foundation.
 
@@ -25,7 +22,7 @@ This is not a production-ready tutor. It is a vertical slice built to show how I
 
 ## Interaction Paths
 
-The prototype is intentionally comparing two ways to make a browser-based tutor feel conversational.
+The prototype implements an explicit speech pipeline and leaves a future direct multimodal route as a production comparison point.
 
 Traditional speech pipeline:
 
@@ -35,13 +32,7 @@ Traditional speech pipeline:
 - an LLM generates the tutor reply text
 - TTS synthesizes reply audio
 
-Direct multimodal LLM route:
-
-- browser audio is routed to a multimodal voice model
-- the model handles the voice interaction end-to-end
-- playback returns to the learner without separate STT and TTS provider hops
-
-The traditional pipeline keeps an explicit transcript boundary, which matters for language tutoring because the learner can see and correct what the system heard. The direct multimodal route tests whether a single model can provide a smoother voice interaction.
+The traditional pipeline keeps an explicit transcript boundary, which matters for language tutoring because the learner can see and correct what the system heard. A future direct multimodal route should be compared against this path to test whether a single model can provide smoother voice interaction without losing transcript visibility, correction review, provider-level control, and debuggability.
 
 ## Provider Modes
 
