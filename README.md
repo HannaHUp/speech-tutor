@@ -5,12 +5,12 @@ Browser-based AI speech tutor prototype with explicit voice-turn orchestration, 
 ## From MVP To Production
 
 - **Current MVP:** a browser voice path built around an explicit `STT -> LLM -> TTS` pipeline with transcript review.
-- **Interview demo layer:** an evidence dashboard that turns fixture speech-session summaries into skill trends, recurring error patterns, and a recommended next instructional action.
+- **Evidence dashboard layer:** a fixture-driven dashboard that turns speech-session summaries into skill trends, recurring error patterns, and a recommended next instructional action.
 - **Production direction:** **Personalized Practice Starters**, a retrieval-backed personalization layer that turns learner history, correction patterns, session summaries, curriculum goals, and lesson content into targeted speaking tasks.
 
-## Interview Positioning
+## Product And Architecture Positioning
 
-Hanna prepared Hermes as a proof-of-capability project for evolving an AI agent from MVP into a production-grade speech tutor. The goal is not only to demo a working voice loop, but to show the architecture and product judgment behind layered agentic systems:
+Hermes is a proof-of-capability project for evolving an AI agent from MVP into a production-grade speech tutor. The goal is not only to demo a working voice loop, but to show the architecture and product judgment behind layered agentic systems:
 
 - owning the path from chatbot MVP to production-grade v2.0 architecture
 - designing explicit LLM orchestration instead of relying on one opaque model call
@@ -44,7 +44,7 @@ The dashboard is fixture-driven on purpose. It does not claim validated assessme
 
 ## Evidence Dashboard Demo
 
-The dashboard is designed for a clear interview story:
+The dashboard is designed around a clear product loop:
 
 ```text
 listen -> collect evidence -> assess -> tutor -> summarize -> recommend next instruction

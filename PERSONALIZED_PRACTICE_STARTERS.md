@@ -95,7 +95,7 @@ Personalized Practice Starters are adaptive. They should be generated from learn
 
 ```text
 Learner level: B1
-Recent topics: job interviews, travel, coffee shops
+Recent topics: work presentations, travel, coffee shops
 Recent mistakes: past tense, word stress, follow-up questions
 Preferred mode: role-play
 Session goal: fluency
@@ -104,7 +104,7 @@ Session goal: fluency
 From that context, Hermes might generate:
 
 ```text
-1. Role-play a job interview. Explain one project you worked on last year.
+1. Role-play a project update. Explain one project you worked on last year.
 2. Tell me about a trip you took recently. Use at least five past-tense verbs.
 3. Order coffee and ask two follow-up questions about the menu.
 ```
@@ -282,7 +282,7 @@ Example:
 
 ```json
 {
-  "topics": ["job interviews", "travel", "coffee shops"],
+  "topics": ["work presentations", "travel", "coffee shops"],
   "skill_focus": ["past tense", "word stress", "follow-up questions"],
   "learner_level": "B1",
   "successful_starter_types": ["role-play", "personal experience"],
@@ -446,4 +446,3 @@ possible self-correction or switch from speaking practice to writing practice
 ```
 
 If the learner changes a lot, Hermes can still use the corrected meaning for the conversation, but should base speaking feedback on the original spoken version.
-
