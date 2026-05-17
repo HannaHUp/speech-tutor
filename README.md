@@ -1,11 +1,22 @@
 # Hermes Speech Tutor
 
-Browser-based AI speech tutor prototype with explicit voice-turn orchestration, swappable speech/LLM providers, and a clear production path toward learner memory and retrieval-backed personalization.
+Browser-based AI speech tutor prototype with explicit voice-turn orchestration, swappable speech/LLM providers, a fixture-driven evidence dashboard, and a clear production path toward learner memory and retrieval-backed personalization.
 
 ## From MVP To Production
 
 - **Current MVP:** a browser voice path built around an explicit `STT -> LLM -> TTS` pipeline with transcript review.
+- **Interview demo layer:** an evidence dashboard that turns fixture speech-session summaries into skill trends, recurring error patterns, and a recommended next instructional action.
 - **Production direction:** **Personalized Practice Starters**, a retrieval-backed personalization layer that turns learner history, correction patterns, session summaries, curriculum goals, and lesson content into targeted speaking tasks.
+
+## Interview Positioning
+
+Hanna prepared Hermes as a proof-of-capability project for evolving an AI agent from MVP into a production-grade speech tutor. The goal is not only to demo a working voice loop, but to show the architecture and product judgment behind layered agentic systems:
+
+- owning the path from chatbot MVP to production-grade v2.0 architecture
+- designing explicit LLM orchestration instead of relying on one opaque model call
+- planning retrieval-backed learner memory across session summaries, correction history, curriculum goals, and lesson content
+- making provider, model-selection, privacy, retention, and evaluation decisions visible
+- creating artifacts that technical and non-technical stakeholders can use to discuss product direction
 
 ## What It Does Today
 
@@ -18,6 +29,36 @@ browser mic -> STT -> transcript review -> LLM -> TTS -> playback
 The most important design choice is that Hermes preserves the **raw STT transcript** separately from the learner's **corrected meaning**. That lets the tutor use the corrected text for conversation while keeping the original spoken evidence available for future pronunciation, fluency, and correction analysis.
 
 ![Hermes Speech Tutor browser prototype](image.png)
+
+The app also includes a demo evidence dashboard that illustrates the next product layer:
+
+```text
+speech turns -> evidence summaries -> skill trends -> recurring issues -> next practice
+```
+
+![Hermes evidence dashboard with teacher next action and recurring evidence signals](image-1.png)
+
+![Hermes evidence dashboard detail view](image-2.png)
+
+The dashboard is fixture-driven on purpose. It does not claim validated assessment, diagnosis, or official CEFR scoring. It demonstrates the product loop Hermes is designed to support: preserve spoken evidence, summarize learning signals, identify recurring issues, and recommend the next practice activity.
+
+## Evidence Dashboard Demo
+
+The dashboard is designed for a clear interview story:
+
+```text
+listen -> collect evidence -> assess -> tutor -> summarize -> recommend next instruction
+```
+
+It shows:
+
+- overview metrics for a demo learner
+- a six-dimension skill radar for accuracy, fluency, pronunciation, vocabulary, coherence, and self-correction
+- a progress trend over recent sessions
+- recurring oral evidence signals with examples and next drills
+- recent session summaries
+- a prominent teacher next-action panel
+
 
 ## Why This Project Exists
 
@@ -89,6 +130,8 @@ This keeps provider selection as an architectural decision instead of something 
 - A learner can speak in the browser and hear a spoken tutor response.
 - The traditional voice pipeline works end to end: mic capture, STT, transcript review, LLM response, TTS, and playback.
 - A learner can correct speech-recognition errors while Hermes preserves the raw transcript.
+- The app can switch between the live Practice voice UI and a Dashboard view without adding persistence.
+- Fixture session data can be shaped into learner metrics, skill trends, recurring oral evidence signals, and teacher next actions.
 - OpenAI and faster-whisper STT run behind the same interface.
 - OpenAI TTS and edge-tts run behind the same interface.
 - OpenAI and Anthropic LLM paths are isolated behind an LLM provider protocol.
@@ -179,7 +222,10 @@ Planned production work:
 - `server/providers/tts_openai.py` and `server/providers/tts_edge.py` implement TTS providers.
 - `server/prosody.py` extracts early voice/prosody features.
 - `server/latency_log.py` and `server/turn_debug_log.py` provide observability hooks.
-- `web/src/App.svelte` is the browser voice UI.
+- `web/src/App.svelte` is the browser app shell with Practice and Dashboard views.
+- `web/src/Dashboard.svelte` renders the fixture-driven evidence dashboard.
+- `web/src/DashboardCharts.svelte` renders lightweight SVG/CSS charts without a chart dependency.
+- `web/src/dashboardData.ts` defines the typed dashboard data contract and demo fixture.
 - `tests/` covers the critical backend seams.
 
 ## What This Is Not
@@ -219,6 +265,8 @@ uv run uvicorn server.main:app --host 127.0.0.1 --port 8000
 ```
 
 Then open `http://localhost:8000`.
+
+Use the `Practice` tab for the live voice tutor and the `Dashboard` tab for the evidence dashboard. The dashboard is local fixture data, so it does not require a database or a completed learner-history pipeline.
 
 `npm run dev` is useful for editing the Svelte UI, but the current WebSocket client connects to `/ws` on the same host. The full voice loop should be tested through the FastAPI backend unless a Vite WebSocket proxy is added.
 
