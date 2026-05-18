@@ -59,6 +59,37 @@ It shows:
 - recent session summaries
 - a prominent teacher next-action panel
 
+## Reading Assessment Core Pipeline
+
+For passage-reading practice, Hermes should preserve structured evidence instead of sending only a transcript to the tutor. The core pipeline would be:
+
+```text
+expected passage
+  -> normalize expected words
+  -> transcribe student audio with word timestamps
+  -> align transcript words to expected words
+  -> detect miscues and compute WER
+  -> add timing and fluency features
+  -> attach confidence and uncertainty
+  -> tutor policy + teacher summary
+```
+
+1. **Normalize the expected passage.** Convert the passage into clean comparison tokens: lowercase text, remove punctuation, split into words, and handle contractions consistently so expected text can be compared with what the student actually said.
+2. **Transcribe audio with word timestamps.** Use an STT provider that can return word-level timing, such as OpenAI STT or faster-whisper:
+
+   ```json
+   [
+     { "word": "the", "start": 0.10, "end": 0.22 },
+     { "word": "bird", "start": 0.40, "end": 0.62 }
+   ]
+   ```
+
+3. **Align transcript words to expected words.** Compare the normalized expected word sequence with the transcript word sequence.
+4. **Detect miscues and compute WER.** Use word-level Levenshtein alignment to identify substitutions, omissions, and insertions. The same alignment can produce word error rate as a summary metric.
+5. **Add timing and fluency features.** Use word timestamps and audio duration to calculate pauses, reading rate, words per minute, and other fluency signals.
+6. **Attach confidence and uncertainty.** Preserve STT confidence where the provider exposes it, especially from hosted providers such as OpenAI, so low-confidence recognition can be treated differently from high-confidence learner miscues.
+7. **Send structured evidence to tutor policy and teacher summary.** The tutor policy can be an explicit rules-and-prompt layer backed by an LLM, but it should receive structured evidence rather than just raw transcript text. Teacher summaries should cite the same evidence so feedback remains inspectable.
+
 
 ## Why This Project Exists
 
